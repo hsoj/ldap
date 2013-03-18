@@ -1,7 +1,10 @@
 Basic LDAP v3 functionality for the GO programming language.  
 
+Most features are used in the test files. ldaplocal_test.go tests
+most new features.
+
 Required Librarys: 
-   github.com/hsoj/asn1-ber
+   github.com/mavricknz/asn1-ber
 
 Working:
    Connecting to LDAP server
@@ -14,14 +17,22 @@ Working:
       Can perform multiple search requests at the same time and return
          the results to the proper goroutine.  All requests are blocking
          requests, so the goroutine does not need special handling
-
+   Request Controls - MatchedValuesRequest, PermissiveModifyRequest,
+      ManageDsaITRequest, SubtreeDeleteRequest, Paging, ServerSideSort
+   
 Tests Implemented:
    Filter Compile / Decompile
+   Local OpenDJ Tests for most Operations
+
+Experimental:
+   LDIF Reader - LDIF entries only (~16k entries/sec)
+   Some limited documentation
 
 TODO:
-   Modify Requests / Responses
-   Add Requests / Responses
-   Delete Requests / Responses
+   LDIF Reader - mods/adds/deletes/...
+   Test to not depend on initial Directory setup
+   Do something with binary attributes.
+   FilterExtensibleMatch Decode
    Modify DN Requests / Responses
-   Compare Requests / Responses
    Implement Tests / Benchmarks
+   Timeouts (connect Go 1.1?), Timeout Operations.

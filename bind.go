@@ -7,19 +7,17 @@ package ldap
 
 import (
 	"errors"
-	"github.com/hsoj/asn1-ber"
+	"github.com/mavricknz/asn1-ber"
 )
 
 func (l *Conn) Bind(username, password string) *Error {
 	messageID := l.nextMessageID()
+	encodedBind := encodeSimpleBindRequest(username, password)
 
-	packet := ber.Encode(ber.ClassUniversal, ber.TypeConstructed, ber.TagSequence, nil, "LDAP Request")
-	packet.AppendChild(ber.NewInteger(ber.ClassUniversal, ber.TypePrimative, ber.TagInteger, messageID, "MessageID"))
-	bindRequest := ber.Encode(ber.ClassApplication, ber.TypeConstructed, ApplicationBindRequest, nil, "Bind Request")
-	bindRequest.AppendChild(ber.NewInteger(ber.ClassUniversal, ber.TypePrimative, ber.TagInteger, 3, "Version"))
-	bindRequest.AppendChild(ber.NewString(ber.ClassUniversal, ber.TypePrimative, ber.TagOctetString, username, "User Name"))
-	bindRequest.AppendChild(ber.NewString(ber.ClassContext, ber.TypePrimative, 0, password, "Password"))
-	packet.AppendChild(bindRequest)
+	packet, err := requestBuildPacket(messageID, encodedBind, nil)
+	if err != nil {
+		return err
+	}
 
 	if l.Debug {
 		ber.PrintPacket(packet)
@@ -52,4 +50,12 @@ func (l *Conn) Bind(username, password string) *Error {
 	}
 
 	return nil
+}
+
+func encodeSimpleBindRequest(username, password string) (bindRequest *ber.Packet) {
+	bindRequest = ber.Encode(ber.ClassApplication, ber.TypeConstructed, ApplicationBindRequest, nil, "Bind Request")
+	bindRequest.AppendChild(ber.NewInteger(ber.ClassUniversal, ber.TypePrimative, ber.TagInteger, 3, "Version"))
+	bindRequest.AppendChild(ber.NewString(ber.ClassUniversal, ber.TypePrimative, ber.TagOctetString, username, "User Name"))
+	bindRequest.AppendChild(ber.NewString(ber.ClassContext, ber.TypePrimative, 0, password, "Password"))
+	return
 }

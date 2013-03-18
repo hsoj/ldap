@@ -8,7 +8,7 @@ package ldap
 import (
 	"errors"
 	"fmt"
-	"github.com/hsoj/asn1-ber"
+	"github.com/mavricknz/asn1-ber"
 	"io/ioutil"
 )
 
@@ -105,6 +105,11 @@ const (
 	ErrorFilterCompile   = 201
 	ErrorFilterDecompile = 202
 	ErrorDebugging       = 203
+	ErrorEncoding        = 204
+	ErrorDecoding        = 205
+	ErrorMissingControl  = 206
+	ErrorInvalidArgument = 207
+	ErrorLDIFRead        = 208
 )
 
 var LDAPResultCodeMap = map[uint8]string{
