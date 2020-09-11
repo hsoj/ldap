@@ -6,10 +6,10 @@
 package ldap
 
 import (
-	"errors"
 	"fmt"
-	"github.com/hsoj/asn1-ber"
+	"github.com/mavricknz/asn1-ber"
 	"io/ioutil"
+	"time"
 )
 
 // LDAP Application Codes
@@ -101,10 +101,23 @@ const (
 	LDAPResultAffectsMultipleDSAs          = 71
 	LDAPResultOther                        = 80
 
-	ErrorNetwork         = 200
-	ErrorFilterCompile   = 201
-	ErrorFilterDecompile = 202
-	ErrorDebugging       = 203
+	ErrorNetwork         = 201
+	ErrorFilterCompile   = 202
+	ErrorFilterDecompile = 203
+	ErrorDebugging       = 204
+	ErrorEncoding        = 205
+	ErrorDecoding        = 206
+	ErrorMissingControl  = 207
+	ErrorInvalidArgument = 208
+	ErrorLDIFRead        = 209
+	ErrorLDIFWrite       = 210
+	ErrorClosing         = 211
+	ErrorUnknown         = 212
+)
+
+const (
+	DefaultTimeout       = 60 * time.Minute
+	ResultChanBufferSize = 5 // buffer items in each chanResults default: 5
 )
 
 var LDAPResultCodeMap = map[uint8]string{
@@ -147,13 +160,24 @@ var LDAPResultCodeMap = map[uint8]string{
 	LDAPResultObjectClassModsProhibited:    "Object Class Mods Prohibited",
 	LDAPResultAffectsMultipleDSAs:          "Affects Multiple DSAs",
 	LDAPResultOther:                        "Other",
+
+	ErrorNetwork:         "ErrorNetwork",
+	ErrorFilterCompile:   "ErrorFilterCompile",
+	ErrorFilterDecompile: "ErrorFilterDecompile",
+	ErrorDebugging:       "ErrorDebugging",
+	ErrorEncoding:        "ErrorEncoding",
+	ErrorDecoding:        "ErrorDecoding",
+	ErrorMissingControl:  "ErrorMissingControl",
+	ErrorInvalidArgument: "ErrorInvalidArgument",
+	ErrorLDIFRead:        "ErrorLDIFRead",
+	ErrorClosing:         "ErrorClosing",
 }
 
 // Adds descriptions to an LDAP Response packet for debugging
-func addLDAPDescriptions(packet *ber.Packet) (err *Error) {
+func addLDAPDescriptions(packet *ber.Packet) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			err = NewError(ErrorDebugging, errors.New("Cannot process packet to add descriptions"))
+			err = NewLDAPError(ErrorDebugging, "Cannot process packet to add descriptions")
 		}
 	}()
 	packet.Description = "LDAP Response"
@@ -217,7 +241,7 @@ func addControlDescriptions(packet *ber.Packet) {
 	packet.Description = "Controls"
 	for _, child := range packet.Children {
 		child.Description = "Control"
-		child.Children[0].Description = "Control Type (" + ControlTypeMap[child.Children[0].Value.(string)] + ")"
+		child.Children[0].Description = "Control Type (" + ControlTypeMap[child.Children[0].ValueString()] + ")"
 		value := child.Children[1]
 		if len(child.Children) == 3 {
 			child.Children[1].Description = "Criticality"
@@ -225,7 +249,7 @@ func addControlDescriptions(packet *ber.Packet) {
 		}
 		value.Description = "Control Value"
 
-		switch child.Children[0].Value.(string) {
+		switch child.Children[0].ValueString() {
 		case ControlTypePaging:
 			value.Description += " (Paging)"
 			if value.Value != nil {
@@ -264,10 +288,10 @@ func addDefaultLDAPResponseDescriptions(packet *ber.Packet) {
 	}
 }
 
-func DebugBinaryFile(FileName string) *Error {
+func DebugBinaryFile(FileName string) error {
 	file, err := ioutil.ReadFile(FileName)
 	if err != nil {
-		return NewError(ErrorDebugging, err)
+		return err
 	}
 	ber.PrintBytes(file, "")
 	packet := ber.DecodePacket(file)
@@ -277,26 +301,40 @@ func DebugBinaryFile(FileName string) *Error {
 	return nil
 }
 
-type Error struct {
-	Err        error
+type LDAPError struct {
+	sText      string
 	ResultCode uint8
 }
 
-func (e *Error) Error() string {
-	return fmt.Sprintf("LDAP Result Code %d %q: %s", e.ResultCode, LDAPResultCodeMap[e.ResultCode], e.Err.Error())
+func (e *LDAPError) Error() string {
+	return fmt.Sprintf("LDAP Result Code %d %q: %s", e.ResultCode, LDAPResultCodeMap[e.ResultCode], e.sText)
 }
 
-func NewError(ResultCode uint8, Err error) *Error {
-	return &Error{ResultCode: ResultCode, Err: Err}
+func (e *LDAPError) Status() string {
+	return e.sText
+}
+
+func NewLDAPError(resultCode uint8, sText string) error {
+	return &LDAPError{ResultCode: resultCode, sText: sText}
 }
 
 func getLDAPResultCode(p *ber.Packet) (code uint8, description string) {
 	if len(p.Children) >= 2 {
 		response := p.Children[1]
-		if response.ClassType == ber.ClassApplication && response.TagType == ber.TypeConstructed && len(response.Children) == 3 {
-			code = uint8(response.Children[0].Value.(uint64))
-			description = response.Children[2].Value.(string)
-			return
+		if response.ClassType == ber.ClassApplication && response.TagType == ber.TypeConstructed {
+			switch {
+			case len(response.Children) == 3:
+				code = uint8(response.Children[0].Value.(uint64))
+				description = response.Children[2].ValueString()
+				return
+			case len(response.Children) == 4 && response.Children[0].Value.(uint64) == uint64(LDAPResultReferral):
+				response = response.Children[3]
+				if response.ClassType == ber.ClassContext && response.TagType == ber.TypeConstructed && len(response.Children) == 1 {
+					code = uint8(LDAPResultReferral)
+					description = response.Children[0].ValueString()
+					return
+				}
+			}
 		}
 	}
 

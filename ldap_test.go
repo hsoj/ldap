@@ -18,9 +18,10 @@ var attributes []string = []string{
 
 func TestConnect(t *testing.T) {
 	fmt.Printf("TestConnect: starting...\n")
-	l, err := Dial("tcp", fmt.Sprintf("%s:%d", ldap_server, ldap_port))
+	l := NewLDAPConnection(ldap_server, ldap_port)
+	err := l.Connect()
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err)
 		return
 	}
 	defer l.Close()
@@ -29,9 +30,10 @@ func TestConnect(t *testing.T) {
 
 func TestSearch(t *testing.T) {
 	fmt.Printf("TestSearch: starting...\n")
-	l, err := Dial("tcp", fmt.Sprintf("%s:%d", ldap_server, ldap_port))
+	l := NewLDAPConnection(ldap_server, ldap_port)
+	err := l.Connect()
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err)
 		return
 	}
 	defer l.Close()
@@ -45,7 +47,7 @@ func TestSearch(t *testing.T) {
 
 	sr, err := l.Search(search_request)
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err)
 		return
 	}
 
@@ -54,16 +56,17 @@ func TestSearch(t *testing.T) {
 
 func TestSearchWithPaging(t *testing.T) {
 	fmt.Printf("TestSearchWithPaging: starting...\n")
-	l, err := Dial("tcp", fmt.Sprintf("%s:%d", ldap_server, ldap_port))
+	l := NewLDAPConnection(ldap_server, ldap_port)
+	err := l.Connect()
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err)
 		return
 	}
 	defer l.Close()
 
 	err = l.Bind("", "")
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err)
 		return
 	}
 
@@ -75,14 +78,14 @@ func TestSearchWithPaging(t *testing.T) {
 		nil)
 	sr, err := l.SearchWithPaging(search_request, 5)
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err)
 		return
 	}
 
 	fmt.Printf("TestSearchWithPaging: %s -> num of entries = %d\n", search_request.Filter, len(sr.Entries))
 }
 
-func testMultiGoroutineSearch(t *testing.T, l *Conn, results chan *SearchResult, i int) {
+func testMultiGoroutineSearch(t *testing.T, l *LDAPConnection, results chan *SearchResult, i int) {
 	search_request := NewSearchRequest(
 		base_dn,
 		ScopeWholeSubtree, DerefAlways, 0, 0, false,
@@ -92,7 +95,7 @@ func testMultiGoroutineSearch(t *testing.T, l *Conn, results chan *SearchResult,
 	sr, err := l.Search(search_request)
 
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err)
 		results <- nil
 		return
 	}
@@ -102,9 +105,10 @@ func testMultiGoroutineSearch(t *testing.T, l *Conn, results chan *SearchResult,
 
 func TestMultiGoroutineSearch(t *testing.T) {
 	fmt.Printf("TestMultiGoroutineSearch: starting...\n")
-	l, err := Dial("tcp", fmt.Sprintf("%s:%d", ldap_server, ldap_port))
+	l := NewLDAPConnection(ldap_server, ldap_port)
+	err := l.Connect()
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err)
 		return
 	}
 	defer l.Close()
